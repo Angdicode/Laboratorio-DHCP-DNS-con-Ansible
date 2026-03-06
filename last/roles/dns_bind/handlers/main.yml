@@ -1,5 +1,0 @@
----
-- name: Reload named
-  ansible.builtin.service:
-    name: "{{ dns_service_name }}"
-    state: reloaded
