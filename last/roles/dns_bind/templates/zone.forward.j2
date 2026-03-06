@@ -1,0 +1,14 @@
+$TTL {{ dns_ttl }}
+@ IN SOA {{ dns_ns_fqdn }}. {{ dns_admin_rname }}. (
+    {{ dns_zone_serial }} ; serial
+    {{ dns_refresh }} ; refresh
+    {{ dns_retry }} ; retry
+    {{ dns_expire }} ; expire
+    {{ dns_minimum_ttl }} ; minimum
+)
+
+@   IN NS {{ dns_ns_fqdn }}.
+
+{% for record in dns_a_records %}
+{{ "%-16s" | format(record.name) }} IN A {{ record.ip }}
+{% endfor %}

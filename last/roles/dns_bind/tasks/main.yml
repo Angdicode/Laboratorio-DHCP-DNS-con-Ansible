@@ -1,0 +1,95 @@
+---
+- name: Install BIND packages
+  ansible.builtin.package:
+    name: "{{ dns_bind_packages }}"
+    state: present
+
+- name: Deploy named.conf
+  ansible.builtin.template:
+    src: named.conf.j2
+    dest: "{{ dns_named_conf_path }}"
+    owner: root
+    group: named
+    mode: "0640"
+    setype: named_conf_t
+    validate: "/usr/sbin/named-checkconf %s"
+  notify: Reload named
+
+- name: Deploy forward zone
+  ansible.builtin.template:
+    src: zone.forward.j2
+    dest: "{{ dns_zone_dir }}/{{ dns_zone_file }}"
+    owner: root
+    group: named
+    mode: "0640"
+    setype: named_zone_t
+    validate: "/usr/sbin/named-checkzone {{ dns_zone_name }} %s"
+  notify: Reload named
+
+- name: Deploy reverse zone
+  ansible.builtin.template:
+    src: zone.reverse.j2
+    dest: "{{ dns_zone_dir }}/{{ dns_reverse_zone_file }}"
+    owner: root
+    group: named
+    mode: "0640"
+    setype: named_zone_t
+    validate: "/usr/sbin/named-checkzone {{ dns_reverse_zone_name }} %s"
+  notify: Reload named
+
+- name: Ensure named is enabled and started
+  ansible.builtin.service:
+    name: "{{ dns_service_name }}"
+    enabled: true
+    state: started
+
+- name: Validate deployed named.conf
+  ansible.builtin.command:
+    cmd: "/usr/sbin/named-checkconf {{ dns_named_conf_path }}"
+  changed_when: false
+
+- name: Validate deployed forward zone
+  ansible.builtin.command:
+    cmd: "/usr/sbin/named-checkzone {{ dns_zone_name }} {{ dns_zone_dir }}/{{ dns_zone_file }}"
+  changed_when: false
+
+- name: Validate deployed reverse zone
+  ansible.builtin.command:
+    cmd: "/usr/sbin/named-checkzone {{ dns_reverse_zone_name }} {{ dns_zone_dir }}/{{ dns_reverse_zone_file }}"
+  changed_when: false
+
+- name: Gather installed packages
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Ensure firewalld is enabled and started when available
+  ansible.builtin.service:
+    name: firewalld
+    enabled: true
+    state: started
+  when: "'firewalld' in ansible_facts.packages"
+
+- name: Query firewalld DNS service
+  ansible.builtin.command:
+    cmd: firewall-cmd --permanent --query-service=dns
+  register: dns_firewalld_query
+  changed_when: false
+  failed_when: dns_firewalld_query.rc not in [0, 1]
+  when: "'firewalld' in ansible_facts.packages"
+
+- name: Open DNS service in firewalld
+  ansible.builtin.command:
+    cmd: firewall-cmd --permanent --add-service=dns
+  register: dns_firewalld_add
+  changed_when: true
+  when:
+    - "'firewalld' in ansible_facts.packages"
+    - dns_firewalld_query.rc == 1
+
+- name: Reload firewalld after DNS rule change
+  ansible.builtin.command:
+    cmd: firewall-cmd --reload
+  changed_when: false
+  when:
+    - "'firewalld' in ansible_facts.packages"
+    - dns_firewalld_query.rc == 1

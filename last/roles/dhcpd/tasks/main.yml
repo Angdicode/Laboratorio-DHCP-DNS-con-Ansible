@@ -1,0 +1,73 @@
+---
+- name: Install DHCP packages
+  ansible.builtin.package:
+    name: "{{ dhcp_packages }}"
+    state: present
+
+- name: Deploy dhcpd.conf
+  ansible.builtin.template:
+    src: dhcpd.conf.j2
+    dest: "{{ dhcp_conf_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "/usr/sbin/dhcpd -t -cf %s"
+  notify: Restart dhcpd
+
+- name: Set DHCP listening interface
+  ansible.builtin.lineinfile:
+    path: "{{ dhcp_sysconfig_path }}"
+    regexp: '^INTERFACESv4='
+    line: 'INTERFACESv4="{{ dhcp_listen_interface }}"'
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart dhcpd
+
+- name: Ensure dhcpd is enabled and started
+  ansible.builtin.service:
+    name: "{{ dhcp_service_name }}"
+    enabled: true
+    state: started
+
+- name: Validate deployed dhcpd.conf
+  ansible.builtin.command:
+    cmd: "/usr/sbin/dhcpd -t -cf {{ dhcp_conf_path }}"
+  changed_when: false
+
+- name: Gather installed packages
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Ensure firewalld is enabled and started when available
+  ansible.builtin.service:
+    name: firewalld
+    enabled: true
+    state: started
+  when: "'firewalld' in ansible_facts.packages"
+
+- name: Query firewalld DHCP service
+  ansible.builtin.command:
+    cmd: firewall-cmd --permanent --query-service=dhcp
+  register: dhcp_firewalld_query
+  changed_when: false
+  failed_when: dhcp_firewalld_query.rc not in [0, 1]
+  when: "'firewalld' in ansible_facts.packages"
+
+- name: Open DHCP service in firewalld
+  ansible.builtin.command:
+    cmd: firewall-cmd --permanent --add-service=dhcp
+  register: dhcp_firewalld_add
+  changed_when: true
+  when:
+    - "'firewalld' in ansible_facts.packages"
+    - dhcp_firewalld_query.rc == 1
+
+- name: Reload firewalld after DHCP rule change
+  ansible.builtin.command:
+    cmd: firewall-cmd --reload
+  changed_when: false
+  when:
+    - "'firewalld' in ansible_facts.packages"
+    - dhcp_firewalld_query.rc == 1

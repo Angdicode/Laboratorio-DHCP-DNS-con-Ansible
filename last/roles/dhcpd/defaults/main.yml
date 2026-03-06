@@ -1,0 +1,27 @@
+---
+dhcp_packages:
+  - dhcp-server
+
+dhcp_service_name: "dhcpd"
+dhcp_conf_path: "/etc/dhcp/dhcpd.conf"
+dhcp_sysconfig_path: "/etc/sysconfig/dhcpd"
+
+dhcp_listen_interface: "enp0s8"
+dhcp_authoritative: true
+dhcp_domain_name: "example.internal"
+dhcp_domain_name_servers:
+  - "192.168.0.10"
+dhcp_default_lease_time: 3600
+dhcp_max_lease_time: 7200
+
+dhcp_subnets:
+  - network: "192.168.0.0"
+    netmask: "255.255.255.0"
+    range_start: "192.168.0.100"
+    range_end: "192.168.0.150"
+    routers: "192.168.0.1"
+    broadcast_address: "192.168.0.255"
+    domain_name: "{{ dhcp_domain_name }}"
+    domain_name_servers: "{{ dhcp_domain_name_servers }}"
+
+dhcp_reservations: []
