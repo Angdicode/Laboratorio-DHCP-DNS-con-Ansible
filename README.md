@@ -30,11 +30,11 @@ La definición de las 3 VMs (IPs, redes, etc.) se hace con Vagrant en el `Vagran
 
 - Rocky Linux 9 en las VMs.
 - Ansible instalado en la máquina `ansible`.
-- Vagrant + VirtualBox (si usas el laboratorio con el `Vagrantfile`).
+- Vagrant + VirtualBox.
 
 ### Uso rápido
 
-1. Levantar las VMs (si usas Vagrant):
+1. Levantar las VMs.
 
    ```bash
    vagrant up
